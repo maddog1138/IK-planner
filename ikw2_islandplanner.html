@@ -1,0 +1,1133 @@
+<html>
+<head>
+
+<script type="text/javascript" src="ik2objects.js"></script>
+
+<style type="text/css">
+
+/* css/tooltip.css -- fancy tooltips */
+
+span.tool {
+  position: relative;   /* this is key */
+  cursor: help;
+}
+
+span.tool span.tip {
+  display: none;        /* so is this */
+}
+
+/* tooltip will display on :hover event */
+
+span.tool:hover span.tip {
+  display: block;
+  z-index: 100;
+  position: absolute;
+  top: 2.5em;
+  left: 0;
+  width: auto;
+  line-height: 1.2em;
+  padding: 3px 7px 4px 6px;
+  border: 1px solid #336;
+  background-color: #f7f7ee;
+  font-family: arial, helvetica, sans-serif;
+  font-size: 12px;
+  font-weight: normal;
+  color: #000;
+  text-align: left;
+}
+
+#content span.tool::after {
+  padding-left: 2px;            /* eye candy */
+  content: url(/img/bubble.gif);
+}
+
+/* css/tooltip.css */
+
+span.warning {
+ color:red;
+ font-weight: bold;
+}
+
+/* =====[ Global Definition ] ====================== */
+body, td, th, input, select, textarea
+{
+ font-family: tahoma, verdana, arial;
+ font-size: 12px;
+}
+body
+{
+ margin-bottom: 100px;
+}
+
+/* GARBAGE */
+td.infobox span
+{
+ visibility:visible;
+ border:2px solid #c30;
+ color:blue;
+ background:white;
+ position:absolute;
+ left:810px;
+ margin-top:1.5em;
+ padding:1em;
+ text-decoration:none;
+}
+
+.map {
+border:1px solid;
+}
+
+</style>
+
+<script language="javascript">
+
+
+
+
+var ecolor = "#9ddf9d";
+var ocolor = "#70d070";
+var ecolord = "#e3e3e3";
+var ocolord = "#f3f3f3";
+var firstTimeRun = true;
+
+var usedSpace = 0;
+
+/*
+* This function is called whenever a player presses a square on the table.
+* What needs to happen here is:
+* - update used space.
+  - update building levels.
+  - update resource levels.
+  - update military availability.
+  - update map visual.
+*/
+function updateBuildingLevel(whichBuilding, newLevel){
+
+  updateUsedSpace (  buildings.structures[whichBuilding], newLevel);
+  buildings.structures[whichBuilding] = newLevel;
+
+  updateResourceLevels(whichBuilding);
+
+  updateTool();
+}
+
+
+function updateResourceLevels(whichBuilding, newLevel) {
+  if (whichBuilding == 'gm') {
+    updateResourceLevelsForGold();
+    updateXxlGoldLeft();
+  } else if (whichBuilding == 'sq'){
+    updateResourceLevelsForStone();
+    updateXxlStoneLeft();
+  } else if (whichBuilding == 'lm'){
+    updateResourceLevelsForLumber();
+    updateXxlLumberLeft();
+  } else if (whichBuilding == 'sh'){
+
+  } else if (whichBuilding == 'b'){
+    updateArmy();
+
+  } else if (whichBuilding == 'h'){
+    updateShips();
+
+  } else if (whichBuilding == 'mh'){
+
+  } else if (whichBuilding == 'l'){
+    updateLab();
+  } else if (whichBuilding == 'sw'){
+    updateDefenseLevelsForWall();
+  } else if (whichBuilding == 'wt'){
+    updateVisibilityForTower();
+  }
+  updateResourceStorageCapacity();  // we want to invoke this either for sh update, or gm,sq,lm update
+}
+
+
+function updateLab() {
+  updateResearch();
+  document.getElementById('catBuildTime').innerHTML = catapult.buildTime[buildings.structures['l']];
+}
+
+/*
+ * This function updates the available army textbox under the build table.
+ * It also updates the available resource to build in the XXL table.
+ */
+function updateArmy() {
+  var s = "";
+  if (buildings.structures['b'] >= 1){
+    s += "Stone Throwers";
+  }
+  if (buildings.structures['b'] >= 5){
+    s += ", Spearfighters";
+  }
+  if (buildings.structures['b'] >= 10){
+    s += ", Archers";
+  }
+  document.getElementById('army').innerHTML = s;
+
+  document.getElementById('stoneBuildTime').innerHTML = stonethrower.buildTime[buildings.structures['b']];
+  document.getElementById('spearBuildTime').innerHTML = spearman.buildTime[buildings.structures['b']];
+  document.getElementById('archerBuildTime').innerHTML = archer.buildTime[buildings.structures['b']];
+}
+
+
+function updateShips(){
+
+	document.getElementById('ships').innerHTML = "";
+	if (buildings.structures['h'] >= 1){
+		document.getElementById('ships').innerHTML = "Small Warships, Small Merchant Ships";
+	}
+	if (buildings.structures['h'] >= 5){
+		document.getElementById('ships').innerHTML += ", Warships, Merchant Ships";
+	}
+	if (buildings.structures['h'] >= 10 && buildings.structures['sh'] >= 15){
+		document.getElementById('ships').innerHTML += ", Colonisation Ships";
+	}
+	
+  document.getElementById('SWSBuildTime').innerHTML = sws.buildTime[buildings.structures['h']];
+  document.getElementById('SMSBuildTime').innerHTML = sms.buildTime[buildings.structures['h']];
+  document.getElementById('LWSBuildTime').innerHTML = lws.buildTime[buildings.structures['h']];
+  document.getElementById('LMSBuildTime').innerHTML = lms.buildTime[buildings.structures['h']];
+  document.getElementById('coloBuildTime').innerHTML = colo.buildTime[buildings.structures['h']];
+}
+
+function updateVisibilityForTower(){
+  resources.visibilityLevel = resources.visibilityRange[buildings.structures['wt']];
+  document.getElementById('visibility').innerHTML = resources.visibilityLevel + " nautical miles";
+}
+
+function updateDefenseLevelsForWall(){
+  resources.defencePercent = resources.defence[buildings.structures['sw']];
+  document.getElementById('protection').innerHTML = resources.defencePercent + " percent";
+}
+
+function updateResourceLevelsForGold(){
+  resources.goldRate = resources.gold[buildings.structures['gm']];
+  document.getElementById('goldprod').innerHTML = resources.goldRate + " per hour";
+  document.getElementById('dailygoldprod').innerHTML = (resources.goldRate * 24) + " per day";
+}
+
+function updateResourceLevelsForStone(){
+  resources.stoneRate = resources.stone[buildings.structures['sq']];
+  document.getElementById('stoneprod').innerHTML = resources.stoneRate + " per hour";
+  document.getElementById('dailystoneprod').innerHTML = (resources.stoneRate * 24) + " per day";
+}
+
+function updateResourceLevelsForLumber(){
+  resources.lumberRate = resources.lumber[buildings.structures['lm']];
+  document.getElementById('lumberprod').innerHTML = resources.lumberRate + " per hour";
+  document.getElementById('dailylumberprod').innerHTML = (resources.lumberRate * 24) + " per day";
+}
+
+function updateResourceStorageCapacity(){
+  resources.storageCapacity = resources.storage[buildings.structures['sh']];
+  document.getElementById('storage').innerHTML = resources.storageCapacity + " units";
+  if (resources.storageCapacity < (resources.goldRate * 24) ||resources.storageCapacity < (resources.stoneRate * 24) || resources.storageCapacity < (resources.lumberRate * 24) ) {
+    document.getElementById('storage').innerHTML += "<span class='warning'> WARNING: Storage capacity UNDER daily production</span>";
+  }
+}
+
+
+
+function updateXxlGoldLeft(){
+  xxl.dailyGoldLeft = (resources.goldRate*24) - xxl.dailyGoldCost;
+  if (xxl.dailyGoldLeft >= 0){
+    document.getElementById('DailyXXLGoldLeft').innerHTML   = xxl.dailyGoldLeft + ' Gold';
+  } else {
+    document.getElementById('DailyXXLGoldLeft').innerHTML   ="<span class='warning'>"+ xxl.dailyGoldLeft + " Gold</span>";
+  }
+}
+
+function updateXxlStoneLeft(){
+  xxl.dailyStoneLeft = (resources.stoneRate*24) - xxl.dailyStoneCost;
+  if (xxl.dailyStoneLeft >= 0){
+    document.getElementById('DailyXXLStoneLeft').innerHTML   = xxl.dailyStoneLeft + ' Stone';
+  } else {
+    document.getElementById('DailyXXLStoneLeft').innerHTML   ="<span class='warning'>"+ xxl.dailyStoneLeft + " Stone</span>";
+  }
+}
+
+function updateXxlLumberLeft(){
+  xxl.dailyLumberLeft = (resources.lumberRate*24) - xxl.dailyLumberCost;
+  if (xxl.dailyLumberLeft >= 0){
+    document.getElementById('DailyXXLLumberLeft').innerHTML   = xxl.dailyLumberLeft + ' Lumber';
+  } else {
+    document.getElementById('DailyXXLLumberLeft').innerHTML   ="<span class='warning'>"+ xxl.dailyLumberLeft + " Lumber</span>";
+  }
+}
+
+/*
+ * update XXL production numbers.  parameters:
+ * XXLlabelName : name of XXL field.
+ * i : index of XXL array, corresponds to the unit type.
+ * x : value to assign to this unit.  Usually is +1 (for now)
+ */
+function updateXXLProduction(item, x) {
+  xxl.schedule[item] += x;
+
+  // here we use an object reference within xxl to get the cost from the actual unit objects.
+  if (xxl.schedule[item]>=0) {
+    xxl.dailyGoldCost   += xxl.units[item].cost['gold'] * x;
+    xxl.dailyStoneCost  += xxl.units[item].cost['stone'] * x;
+    xxl.dailyLumberCost += xxl.units[item].cost['lumber'] * x;
+  }
+
+  if (xxl.schedule[item] < 0) { xxl.schedule[item]=0;}
+  document.getElementById("XXL" + item).innerHTML  = xxl.schedule[item];
+
+  // here we verify that the daily cost is not below zero
+  if (xxl.dailyGoldCost < 0) {xxl.dailyGoldCost = 0;}
+  if (xxl.dailyStoneCost < 0) {xxl.dailyStoneCost = 0;}
+  if (xxl.dailyLumberCost < 0) {xxl.dailyLumberCost = 0;}
+
+  // here we place the daily cost on the page.
+  document.getElementById('DailyXXLLumberCost').innerHTML = xxl.dailyLumberCost + ' Lumber';
+  document.getElementById('DailyXXLStoneCost').innerHTML  = xxl.dailyStoneCost + ' Stone';
+  document.getElementById('DailyXXLGoldCost').innerHTML   = xxl.dailyGoldCost + ' Gold';
+
+  // call utility function to update the remaining resources on the island.
+  updateXxlGoldLeft();
+  updateXxlStoneLeft();
+  updateXxlLumberLeft();
+}
+
+
+
+function initializedXXL () {
+/*
+  updateXXLProduction('stonie', 0);  // (Stonie, no change)
+  updateXXLProduction('spear', 0);   // Spearman
+  updateXXLProduction('archer', 0);    //archer;
+  updateXXLProduction('cat', 0);
+  updateXXLProduction('sws', 0);
+  updateXXLProduction('sms', 0);
+  updateXXLProduction('lws', 0);
+  updateXXLProduction('lms', 0);
+  updateXXLProduction('cat', 0);
+  updateXXLProduction('colo', 0);
+*/
+
+
+  document.getElementById('DailyXXLLumberCost').innerHTML = xxl.dailyLumberCost + ' Lumber';
+  document.getElementById('DailyXXLStoneCost').innerHTML  = xxl.dailyStoneCost + ' Stone';
+  document.getElementById('DailyXXLGoldCost').innerHTML   = xxl.dailyGoldCost + ' Gold';
+
+  updateXxlGoldLeft();
+  updateXxlStoneLeft();
+  updateXxlLumberLeft();
+}
+
+
+function updateUsedSpace ( oldLevel, newLevel) {
+  buildings.usedSpace -= buildings.spaceCost[oldLevel];
+  buildings.usedSpace += buildings.spaceCost[newLevel];
+
+  document.getElementById('score').innerHTML = buildings.usedSpace;
+}
+
+// this is a onetime function to initialize used space.
+function initializeUsedSpace () {
+  buildings.usedSpace = 0;
+  for (building in buildings.structures){
+    buildings.usedSpace += buildings.spaceCost[buildings.structures[building]];
+  }
+  document.getElementById('score').innerHTML = buildings.usedSpace;
+}
+
+
+
+// 1 = light, 2 = darker
+cellShade = { 'mh1':1,'mh5':1,'mh10':1,'l1':1,'l5':1,'l10':1,'h1':1,'h5':1,'h10':1,'b1':2,'b5':2,'b10':2,'sh7':2,'sh8':2,'sh15':2};
+
+
+
+
+function updateTool(){
+
+  var rowCount = 0;
+
+  // For each building in building list, this will iterate through the entire list ob buildings and set
+  //.the table boxes.  Need to find a way to limit the amount of work this does:
+  // - before setting an attribute, test for it(?)
+  for (building in buildings.structures){
+      for (var i=0;i<25;i++){
+      var theID = building + i;
+
+      var specialShade = 0;       // test for special building.
+      if (cellShade[theID] ) {specialShade = cellShade[theID];}
+
+
+      var cellText;
+      var isSelected = false;
+      if (buildings.structures[building] == i){
+        isSelected = true;
+        cellText = "<font color='yellow'><b>" + i + "</b><font>";
+      }else{
+        cellText = i;
+      }
+
+      var theElement = document.getElementById(theID);
+
+      if ((buildings.spaceCost[i] + buildings.usedSpace) - buildings.spaceCost[buildings.structures[building]] > 1000 && buildings.structures[building] < i) {
+        if (isSelected){
+          document.getElementById(theID).bgColor = "#A0522D";
+        }else{
+          if (rowCount % 2 == 0){
+            if (specialShade) {theElement.bgColor = "#c3c3c3";}
+            else {document.getElementById(theID).bgColor = ecolord;}
+          }else{
+            if (specialShade) {document.getElementById(theID).bgColor = "#d3d3d3";}
+            else {document.getElementById(theID).bgColor = ocolord;}
+          }
+        }
+
+        if (theElement.getAttribute("onClick")){
+          theElement.removeAttribute("onClick");
+        }
+//				theElement.innerHTML = "<span>" + cellText + "</span>";
+      }else{
+        if (isSelected){
+          document.getElementById(theID).bgColor = "#A0522D";
+        }else{
+          if (rowCount % 2 == 0){
+            if (specialShade) {theElement.bgColor = "#cddf9d";}
+            else {document.getElementById(theID).bgColor = ecolor;}
+          }else{
+            if (specialShade) {theElement.bgColor = "#c0d070";}
+            else {document.getElementById(theID).bgColor = ocolor;}
+          }
+        }
+        if (!document.getElementById(theID).getAttribute("onClick")){
+          document.getElementById(theID).setAttribute("onClick", "updateBuildingLevel(\"" + building + "\"," + i + ")");
+        }
+      }
+    }
+    rowCount++;
+
+  }
+
+}
+
+
+function buildLink() {
+  var pageHref = "http://" + location.host + location.pathname + "?";
+  for (building in buildings.structures){
+    pageHref += "&" + building + "=" + buildings.structures[building];
+  }
+
+  for (xxlitem in xxl.schedule){
+    pageHref += "&" + xxlitem + "=" + xxl.schedule[xxlitem];
+  }
+
+  document.getElementById('sharelink').innerHTML = '<a href="' + pageHref + '">' + pageHref + '</a>';
+}
+
+/*
+* This is a one time initialization function.  It sets up the tooltips on the main build table.
+*
+*/
+function initializeBuildTableTooltips(){
+  for (building in buildings.structures){
+    for (var i=0;i<25;i++){
+      var theID = building + i;
+      document.getElementById(theID).title = buildTooltips(building, i);
+    }
+  }
+}
+
+
+function resetTool(){
+  for (building in buildings.structures){
+    buildings.structures[building] = 0;
+  }
+
+
+  xxl.dailyGoldCost = 0;
+  xxl.dailyStoneCost = 0;
+  xxl.dailyLumberCost = 0;
+
+  // update XXL
+  for (xxlitem in xxl.schedule){
+    xxl.schedule[xxlitem]=0;
+    updateXXLProduction(xxlitem, 0);
+  }
+
+
+  initializeUsedSpace();
+
+  updateResourceLevelsForGold();
+  updateResourceLevelsForStone();
+  updateResourceLevelsForLumber();
+  updateResourceStorageCapacity();
+
+  updateDefenseLevelsForWall();
+  updateVisibilityForTower();
+  updateArmy();
+  updateShips();
+  updateLab();
+
+  // update the main table.
+  updateTool();
+
+
+  initializedXXL();
+}
+
+function updateResearch(){
+	document.getElementById('research').innerHTML = "";
+	if (buildings.structures['l'] >= 1){
+		document.getElementById('research').innerHTML = "Spear, Shield";
+	}
+	if (buildings.structures['l'] >= 5){
+		document.getElementById('research').innerHTML += ", Bow";
+	}
+	if (buildings.structures['l'] >= 10){
+		document.getElementById('research').innerHTML += ", Sail, Catapults";
+	}
+}
+
+
+
+function buildTooltips(whichBuilding, whatLevel){
+        var tooltipString = "";
+	if (whichBuilding == "mh"){
+		if (whatLevel == 1){
+			tooltipString = "Resources can be built, Colonizer needs cats";
+		}
+		if (whatLevel == 5){
+			tooltipString = "Barracks";
+		}
+		if (whatLevel == 10){
+			tooltipString = "Laboratory, Harbor";
+		}
+	}
+	if (whichBuilding == "gm"){
+		tooltipString = resources.gold[whatLevel] + " per hour";
+	}
+	if (whichBuilding == "sq"){
+		tooltipString = resources.stone[whatLevel] + " per hour";
+	}
+	if (whichBuilding == "lm"){
+		tooltipString = resources.lumber[whatLevel] + " per hour";
+	}
+	if (whichBuilding == "l"){
+		if (whatLevel == 1){
+			tooltipString = "Spear, Shield";
+		}
+		if (whatLevel == 5){
+			tooltipString = "Bow";
+		}
+		if (whatLevel == 10){
+			tooltipString = "Sail, Catapults";
+		}
+	}
+	if (whichBuilding == "b"){
+		if (whatLevel == 1){
+			tooltipString = "Stone Throwers";
+		}
+		if (whatLevel == 5){
+			tooltipString = "Spearfighters";
+		}
+		if (whatLevel == 10){
+			tooltipString = "Archers";
+		}
+	}
+	if (whichBuilding == "h"){
+		if (whatLevel == 1){
+			tooltipString = "Small Warships, Small Merchant Ships";
+		}
+		if (whatLevel == 5){
+			tooltipString = "Warships, Large Merchant Ships";
+		}
+		if (whatLevel == 10){
+			tooltipString = "Colonisation Ships";
+		}
+	}
+	if (whichBuilding == "sh"){
+		tooltipString = resources.storage[whatLevel] + " units";
+		if (whatLevel == 7){
+			tooltipString += ", Sail Level 1";
+		}
+		if (whatLevel == 8){
+			tooltipString += ", Sail Level 2";
+		}
+		if (whatLevel == 15){
+			tooltipString += ", Colonisation Ships";
+		}
+	}
+	if (whichBuilding == "sw"){
+		tooltipString = resources.defence[whatLevel] + " percent";
+	}
+	if (whichBuilding == "wt"){
+		tooltipString = resources.visibilityRange[whatLevel] + " nautical miles";
+	}
+  return tooltipString;
+}
+
+/*
+function clearInformation(){
+	document.getElementById('information').innerHTML = "";
+}
+*/
+
+
+function updateBuildTimes(){
+	document.getElementById('stoneBuildTime').innerHTML = stonethrower.buildTime[buildings.structures['b']];
+	document.getElementById('spearBuildTime').innerHTML = spearTime[buildings.b];
+	document.getElementById('archerBuildTime').innerHTML = archerTime[buildings.b];
+
+	document.getElementById('catBuildTime').innerHTML = catTime[buildings.l];
+
+	document.getElementById('SWSBuildTime').innerHTML = SWSTime[buildings.h];
+	document.getElementById('SMSBuildTime').innerHTML = SMSTime[buildings.h];
+	document.getElementById('LWSBuildTime').innerHTML = LWSTime[buildings.h];
+	document.getElementById('LMSBuildTime').innerHTML = LMSTime[buildings.h];
+	document.getElementById('coloBuildTime').innerHTML = coloTime[buildings.h];
+}
+
+// based on code found here: http://www.netlobo.com/url_query_string_javascript.html
+function getParamValue (name){
+	name = name.replace(/[\[]/,"\\\[").replace(/[\]]/,"\\\]");
+	var regexS = "[\\?&]"+name+"=([^&#]*)";
+	var regex = new RegExp( regexS );
+	var results = regex.exec( window.location.href );
+	if( results == null ){
+		return 0;
+	}else{
+		return results[1];
+	}
+}
+
+/*
+* this will initialize the page in case there is some data on the link to this page
+*/
+function grabParams (){
+  for (building in buildings.structures){
+    buildings.structures[building] = getParamValue(building);
+  }
+
+  for (xxlitem in xxl.schedule){
+    updateXXLProduction(xxlitem, parseInt(getParamValue(xxlitem)));
+  }
+}
+
+/*
+*--------------------------------------------------------------
+* Onetime function to initialize everything on the page.
+*--------------------------------------------------------------
+*/
+function initializeTools(){
+  // grab parameters from url, if any are present
+  grabParams();
+
+  // after we get the parms, we know what levels our buildings are at, so we can initialize used space.
+  initializeUsedSpace();
+
+  updateResourceLevelsForGold();
+  updateResourceLevelsForStone();
+  updateResourceLevelsForLumber();
+  updateResourceStorageCapacity();
+
+  updateDefenseLevelsForWall();
+  updateVisibilityForTower();
+  updateArmy();
+  updateShips();
+  updateLab();
+
+  // update the main table.
+  updateTool();
+  initializedXXL();
+
+
+  // setup the tooltips on the table.
+  initializeBuildTableTooltips();
+
+}
+
+
+</script>
+
+</head>
+<body>
+
+<a href="javascript:buildLink()">Generate link to this build:</a>
+<div width=100% id="sharelink">
+
+</div>
+<br/>
+
+<br/>
+
+
+<table class="map" width="800" height="10" cellpadding="4" cellspacing="2" border="0">
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Building</td>
+		<td colspan="25" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="middle">Building Level</td>
+	</tr>
+	<tr>
+		<td bgcolor="#9ddf9d" width="20%" height="10" valign="middle" align="right" id="mht"> Main House  </td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh0">0</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh1">1</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh2">2</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh3">3</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh4">4</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh5">5</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh6">6</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh7">7</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh8">8</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh9">9</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh10">10</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh11">11</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh12">12</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh13">13</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh14">14</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh15">15</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh16">16</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh17">17</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh18">18</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh19">19</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh20">20</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh21">21</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh22">22</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh23">23</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="mh24">24</td>
+	</tr>
+	<tr>
+		<td bgcolor="#70d070" width="20%" height="10" valign="middle" align="right" id="gmt"> Goldmine  </td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm0">0</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm1">1</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm2">2</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm3">3</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm4">4</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm5">5</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm6">6</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm7">7</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm8">8</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm9">9</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm10">10</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm11">11</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm12">12</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm13">13</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm14">14</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm15">15</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm16">16</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm17">17</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm18">18</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm19">19</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm20">20</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm21">21</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm22">22</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm23">23</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="gm24">24</td>
+	</tr>
+	<tr>
+		<td bgcolor="#9ddf9d" width="20%" height="10" valign="middle" align="right" id="sqt"> Stone Quarry  </td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq0">0</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq1">1</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq2">2</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq3">3</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq4">4</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq5">5</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq6">6</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq7">7</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq8">8</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq9">9</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq10">10</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq11">11</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq12">12</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq13">13</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq14">14</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq15">15</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq16">16</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq17">17</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq18">18</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq19">19</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq20">20</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq21">21</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq22">22</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq23">23</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sq24">24</td>
+	</tr>
+	<tr>
+		<td bgcolor="#70d070" width="20%" height="10" valign="middle" align="right" id="lmt"> Lumber Mill  </td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm0">0</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm1">1</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm2">2</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm3">3</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm4">4</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm5">5</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm6">6</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm7">7</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm8">8</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm9">9</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm10">10</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm11">11</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm12">12</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm13">13</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm14">14</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm15">15</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm16">16</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm17">17</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm18">18</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm19">19</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm20">20</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm21">21</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm22">22</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm23">23</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="lm24">24</td>
+	</tr>
+	<tr>
+		<td bgcolor="#9ddf9d" width="20%" height="10" valign="middle" align="right" id="lt"> Laboratory </td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l0">0</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l1">1</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l2">2</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l3">3</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l4">4</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l5">5</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l6">6</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l7">7</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l8">8</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l9">9</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l10">10</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l11">11</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l12">12</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l13">13</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l14">14</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l15">15</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l16">16</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l17">17</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l18">18</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l19">19</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l20">20</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l21">21</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l22">22</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l23">23</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="l24">24</td>
+	</tr>
+	<tr>
+		<td bgcolor="#70d070" width="20%" height="10" valign="middle" align="right" id="bt"> Barracks </td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b0">0</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b1">1</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b2">2</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b3">3</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b4">4</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b5">5</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b6">6</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b7">7</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b8">8</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b9">9</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b10">10</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b11">11</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b12">12</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b13">13</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b14">14</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b15">15</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b16">16</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b17">17</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b18">18</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b19">19</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b20">20</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b21">21</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b22">22</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b23">23</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="b24">24</td>
+	</tr>
+	<tr>
+		<td bgcolor="#9ddf9d" width="20%" height="10" valign="middle" align="right" id="ht"> Harbor  </td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h0">0</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h1">1</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h2">2</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h3">3</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h4">4</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h5">5</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h6">6</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h7">7</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h8">8</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h9">9</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h10">10</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h11">11</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h12">12</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h13">13</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h14">14</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h15">15</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h16">16</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h17">17</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h18">18</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h19">19</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h20">20</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h21">21</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h22">22</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h23">23</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="h24">24</td>
+	</tr>
+	<tr>
+		<td bgcolor="#70d070" width="20%" height="10" valign="middle" align="right" id="sht"> Storehouse  </td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh0">0</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh1">1</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh2">2</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh3">3</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh4">4</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh5">5</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh6">6</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh7">7</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh8">8</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh9">9</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh10">10</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh11">11</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh12">12</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh13">13</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh14">14</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh15">15</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh16">16</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh17">17</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh18">18</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh19">19</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh20">20</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh21">21</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh22">22</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh23">23</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="sh24">24</td>
+	</tr>
+	<tr>
+		<td bgcolor="#9ddf9d" width="20%" height="10" valign="middle" align="right" id="swt"> Stone Wall  </td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw0">0</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw1">1</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw2">2</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw3">3</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw4">4</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw5">5</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw6">6</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw7">7</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw8">8</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw9">9</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw10">10</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw11">11</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw12">12</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw13">13</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw14">14</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw15">15</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw16">16</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw17">17</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw18">18</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw19">19</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw20">20</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw21">21</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw22">22</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw23">23</td>
+		<td bgcolor="#e3e3e3" width="3.2%" height="10" valign="middle" align="middle" id="sw24">24</td>
+	</tr>
+	<tr>
+		<td bgcolor="#70d070" width="20%" height="10" valign="middle" align="right" id="wtt"> Watch Tower </td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt0">0</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt1">1</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt2">2</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt3">3</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt4">4</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt5">5</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt6">6</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt7">7</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt8">8</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt9">9</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt10">10</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt11">11</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt12">12</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt13">13</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt14">14</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt15">15</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt16">16</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt17">17</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt18">18</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt19">19</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt20">20</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt21">21</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt22">22</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt23">23</td>
+		<td bgcolor="#f3f3f3" width="3.2%" height="10" valign="middle" align="middle" id="wt24">24</td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Score:</td>
+		<td colspan="18" bgcolor="#C3C3C3" width="57.6%" height="10" valign="middle" align="left" id="score">0</td>
+		<td colspan="7" bgcolor="#C3C3C3" width="22.4%" height="10" valign="middle" align="middle" cellpadding="0" cellspacing="0" border="0">
+			<input type='Submit' name='totalegal' value='<<< Reset all to 0 >>>' style="BACKGROUND-COLOR: #ffffff; COLOR: #666666; FONT-FAMILY: Verdana; FONT-SIZE: 8pt; BORDER-STYLE: solid; BORDER-COLOR: #999999; border-width : 1;" onClick="resetTool()">
+		</td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Gold production:</td>
+		<td colspan="10" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="goldprod"></td>
+		<td colspan="15" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="dailygoldprod"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Stone production:</td>
+		<td colspan="10" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="stoneprod"></td>
+		<td colspan="15" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="dailystoneprod"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Lumber production:</td>
+		<td colspan="10" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="lumberprod"></td>
+		<td colspan="15" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="dailylumberprod"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Storage capacity:</td>
+		<td colspan="25" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="storage"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Protection:</td>
+		<td colspan="25" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="protection"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Visibility:</td>
+		<td colspan="25" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="visibility"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Research Available:</td>
+		<td colspan="25" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="research"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Army Available:</td>
+		<td colspan="25" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="army"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="20%" height="10" valign="middle" align="right">Ships available:</td>
+		<td colspan="25" bgcolor="#C3C3C3" width="80%" height="10" valign="middle" align="left" id="ships"></td>
+	</tr>
+</table>
+
+<br />
+
+<table width="500" height="10" cellpadding="4" cellspacing="2" border="0">
+	<tr>
+		<td bgcolor="red" width="30%" height="10" valign="middle" align="right" style="color:white;">Land Unit</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="middle">Build Time</td>
+        </tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Stone Thrower</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="left" id="stoneBuildTime"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">SpearFighter</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="left" id="spearBuildTime"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Archer</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="left" id="archerBuildTime"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Catapult</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="left" id="catBuildTime"></td>
+	</tr>
+</table>
+<br />
+<table width="500" height="10" cellpadding="4" cellspacing="2" border="0">
+	<tr>
+		<td bgcolor="blue" width="30%" height="10" valign="middle" align="right" style="color:white;">Naval Unit</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="middle">Build Time</td>
+        </tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Small Warship</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="left" id="SWSBuildTime"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Small Merchant Ship</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="left" id="SMSBuildTime"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Warship</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="left" id="LWSBuildTime"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Merchant Ship</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="left" id="LMSBuildTime"></td>
+	</tr>
+	<tr>
+		<td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Colonization Ship</td>
+		<td bgcolor="#C3C3C3" width="70%" height="10" valign="middle" align="left" id="coloBuildTime"></td>
+	</tr>
+</table>
+<br />
+<br />
+<table class="map"><tr><td>
+<table width="500" height="10" cellpadding="4" cellspacing="2" border="0">
+ <tr>
+  <td bgcolor="blue" width="30%" height="10" valign="middle" align="right" style="color:white;">XXL planning</td>
+  <td bgcolor="#C3C3C3" width="70%" colspan="3" height="10" valign="middle" align="middle">Daily production</td>
+ </tr>
+
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Small Warships</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('sws', 1)">+</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('sws', -1)">-</td>
+  <td bgcolor="#C3C3C3" width="60%" height="10" valign="middle" align="middle" id="XXLsws"></td>
+ </tr>
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Small Merchant Ships</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('sms', 1)">+</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('sms', -1)">-</td>
+  <td bgcolor="#C3C3C3" width="60%" height="10" valign="middle" align="middle" id="XXLsms"></td>
+ </tr>
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Warships</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('lws', 1)">+</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('lws', -1)">-</td>
+  <td bgcolor="#C3C3C3" width="60%" height="10" valign="middle" align="middle" id="XXLlws"></td>
+ </tr>
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Merchant Ships</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('lms', 1)">+</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('lms', -1)">-</td>
+  <td bgcolor="#C3C3C3" width="60%" height="10" valign="middle" align="middle" id="XXLlms"></td>
+ </tr>
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Colonization Ships</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('colo', 1)">+</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('colo', -1)">-</td>
+  <td bgcolor="#C3C3C3" width="60%" height="10" valign="middle" align="middle" id="XXLcolo"></td>
+ </tr>
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Stone Throwers</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('stonie', 1)">+</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('stonie', -1)">-</td>
+  <td bgcolor="#C3C3C3" width="60%" height="10" valign="middle" align="middle" id="XXLstonie"></td>
+ </tr>
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Spearfighters</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('spear', 1)">+</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('spear', -1)">-</td>
+  <td bgcolor="#C3C3C3" width="60%" height="10" valign="middle" align="middle" id="XXLspear"></td>
+ </tr>
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Archers</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('archer', 1)">+</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('archer', -1)">-</td>
+  <td bgcolor="#C3C3C3" width="60%" height="10" valign="middle" align="middle" id="XXLarcher"></td>
+ </tr>
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Catapults</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('cat', 1)">+</td>
+  <td bgcolor="#C3C3C3" width="5%" height="10" valign="middle" align="middle" onClick="updateXXLProduction('cat', -1)">-</td>
+  <td bgcolor="#C3C3C3" width="60%" height="10" valign="middle" align="middle" id="XXLcat"></td>
+ </tr>
+
+</table>
+<br />
+<table width="500" height="10" cellpadding="4" cellspacing="2" border="0">
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Daily cost</td>
+  <td bgcolor="#C3C3C3" width="23%" height="10" valign="middle" align="middle" id='DailyXXLGoldCost'></td>
+  <td bgcolor="#C3C3C3" width="23%" height="10" valign="middle" align="middle" id='DailyXXLLumberCost'></td>
+  <td bgcolor="#C3C3C3" width="24%" height="10" valign="middle" align="middle" id="DailyXXLStoneCost"></td>
+ </tr>
+ <tr>
+  <td bgcolor="#C3C3C3" width="30%" height="10" valign="middle" align="right">Remaining resources</td>
+  <td bgcolor="#C3C3C3" width="23%" height="10" valign="middle" align="middle" id='DailyXXLGoldLeft'>Gold</td>
+  <td bgcolor="#C3C3C3" width="23%" height="10" valign="middle" align="middle" id='DailyXXLLumberLeft'>Lumber</td>
+  <td bgcolor="#C3C3C3" width="24%" height="10" valign="middle" align="middle" id="DailyXXLStoneLeft">Stone</td>
+ </tr>
+</table>
+</td></tr>
+</table>
+<script language="javascript">
+
+initializeTools();
+</script>
+</body>
+</html>
